@@ -1,0 +1,67 @@
+#Головной проект (балансер): https://github.com/WebmiRU/strahovka_balancer
+
+version: "3"
+
+services:
+  chat12_php:
+    container_name: chat12_php
+    build: docker
+    ports:
+      - 9101:9101
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:/var/www/default/www
+    #   - /var/keys/:/root/.ssh/
+    working_dir: /var/www/default/www
+    networks:
+      - strahovka
+        
+  chat12_postgres:
+    container_name: chat12_postgres
+    image: postgres:14.2-alpine
+    volumes:
+      - chat12_db:/var/lib/postgresql/data
+      - ./:/root/htdocs
+      - /home/ewolf/.pgpass:/root/.pgpass
+    working_dir: /root/htdocs
+    environment:
+      - POSTGRES_DB=chat12
+      - POSTGRES_DATABSE=chat12
+      - POSTGRES_USER=chat12
+      - POSTGRES_PASSWORD=chat12
+      - PGDATA=/var/lib/postgresql/data
+    networks:
+      - strahovka
+    ports:
+      - 5435:5432
+
+  chat12_nginx:
+    container_name: chat12_nginx
+    image: devilbox/nginx-stable
+    volumes:
+      - ./:/var/www/default/www
+    working_dir: /var/www/default/www
+    environment:
+      - PHP_FPM_ENABLE=1
+      - PHP_FPM_SERVER_ADDR=chat12_php
+      - PHP_FPM_SERVER_PORT=9081
+      - MAIN_VHOST_DOCROOT=www/
+      - DOCKER_LOGS=1
+      - HTTP2_ENABLE=0
+    depends_on:
+      - chat12_php
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.chat12_nginx.rule=Host(`chat12.dev11.ru`)
+    networks:
+      - strahovka
+
+
+networks:
+  strahovka:
+    external:
+      name: strahovka
+
+volumes:
+  chat12_db:
+    external: true
