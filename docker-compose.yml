@@ -1,5 +1,3 @@
-#Головной проект (балансер): https://github.com/WebmiRU/strahovka_balancer
-
 version: "3"
 
 services:
@@ -14,8 +12,10 @@ services:
     #   - /var/keys/:/root/.ssh/
     working_dir: /var/www/default/www
     networks:
-      - strahovka
-        
+      - systemz
+    extra_hosts:
+      - host.docker.internal:host-gateway
+
   chat12_postgres:
     container_name: chat12_postgres
     image: postgres:14.2-alpine
@@ -31,7 +31,7 @@ services:
       - POSTGRES_PASSWORD=chat12
       - PGDATA=/var/lib/postgresql/data
     networks:
-      - strahovka
+      - systemz
     ports:
       - 5435:5432
 
@@ -54,14 +54,16 @@ services:
       - traefik.enable=true
       - traefik.http.routers.chat12_nginx.rule=Host(`chat12.dev11.ru`)
     networks:
-      - strahovka
+      - systemz
 
 
 networks:
-  strahovka:
+  systemz:
     external:
-      name: strahovka
+      name: systemz
 
 volumes:
   chat12_db:
     external: true
+
+#--add-host=host.docker.internal:host-gateway

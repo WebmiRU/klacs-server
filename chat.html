@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title 123</title>
+</head>
+<body>
+
+<textarea style="border: 1px solid black; width: 300px; height: 100px;"></textarea>
+
+<aside>
+    <ul id="channel-list"></ul>
+</aside>
+
+<script>
+    let token = 'ffeffbeb44b538d48f3a26e768bbb59f88e558865764c544315c67608bf02c47';
+    let textarea = document.getElementsByTagName('textarea')[0];
+    let channelList = document.getElementById('channel-list');
+
+    textarea.onkeydown = function (e) {
+        if (e.key == 'Enter') sendMessage();
+    };
+
+    function sendMessage() {
+        socket.send(textarea.value);
+    }
+
+    let socket = new WebSocket("ws://127.0.0.1:9101");
+
+    socket.onopen = function () {
+        console.log("Соединение установлено.");
+
+        socket.send(JSON.stringify({
+            "type": "REQUEST",
+            "target": "CHANNEL_LIST",
+            "token": token,
+        }));
+    };
+
+    socket.onclose = function (event) {
+        if (event.wasClean) {
+            console.log('Соединение закрыто чисто');
+        } else {
+            console.log('Обрыв соединения'); // например, "убит" процесс сервера
+        }
+
+        console.log('Код: ' + event.code + ' причина: ' + event.reason);
+    };
+
+    socket.onmessage = function (e) {
+        let msg = JSON.parse(e.data);
+        console.log(msg);
+        console.log(e);
+
+        if (msg.type == 'RESPONSE' && msg.target == 'CHANNEL_LIST') {
+            channelList.innerHtml = null;
+
+            msg.data.forEach((v, i) => {
+                let channel = document.createElement('li');
+                channel.innerText = v.title;
+
+                channelList.append(channel);
+            });
+        }
+    };
+
+    socket.onerror = function (error) {
+        console.log("Ошибка " + error.message);
+    };
+</script>
+</body>
+</html>
