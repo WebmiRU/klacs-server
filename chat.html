@@ -6,7 +6,7 @@
 </head>
 <body>
 
-<textarea style="border: 1px solid black; width: 300px; height: 100px;"></textarea>
+<textarea id="message-input" style="border: 1px solid black; width: 300px; height: 100px;"></textarea>
 
 <aside>
     <ul id="channel-list"></ul>
@@ -14,21 +14,38 @@
 
 <script>
     let token = 'ffeffbeb44b538d48f3a26e768bbb59f88e558865764c544315c67608bf02c47';
-    let textarea = document.getElementsByTagName('textarea')[0];
+    let messageInput = document.getElementById('message-input');
     let channelList = document.getElementById('channel-list');
 
-    textarea.onkeydown = function (e) {
-        if (e.key == 'Enter') sendMessage();
+    messageInput.onkeydown = function (e) {
+        if (e.key == 'Enter') {
+            sendMessage();
+            e.preventDefault();
+        }
     };
 
     function sendMessage() {
-        socket.send(textarea.value);
+        socket.send(JSON.stringify({
+            "type": "MESSAGE",
+            "target": "CHANNEL",
+            "channel_id": 1,
+            "message": messageInput.value,
+        }));
+
+        messageInput.focus();
+        messageInput.value = null;
     }
 
     let socket = new WebSocket("ws://127.0.0.1:9101");
 
     socket.onopen = function () {
         console.log("Соединение установлено.");
+
+        // Авторизация
+        socket.send(JSON.stringify({
+            "type": "AUTH",
+            "token": token,
+        }));
 
         socket.send(JSON.stringify({
             "type": "REQUEST",
@@ -50,7 +67,7 @@
     socket.onmessage = function (e) {
         let msg = JSON.parse(e.data);
         console.log(msg);
-        console.log(e);
+        // console.log(e);
 
         if (msg.type == 'RESPONSE' && msg.target == 'CHANNEL_LIST') {
             channelList.innerHtml = null;

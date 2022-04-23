@@ -3,7 +3,7 @@
 namespace App\Messages;
 
 
-class ChannelList
+class ChannelList extends Message
 {
     public string $type = 'RESPONSE';
     public string $target = 'CHANNEL_LIST';

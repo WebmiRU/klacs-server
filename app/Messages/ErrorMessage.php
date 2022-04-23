@@ -2,7 +2,7 @@
 
 namespace App\Messages;
 
-class ErrorMessage
+class ErrorMessage extends Message
 {
     public int $code;
     public string $message;
