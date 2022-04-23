@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Messages\AuthError;
+use App\Messages\AuthSuccess;
 use App\Messages\ChannelList;
 use App\Messages\ChannelMessage;
 use App\Messages\ErrorMessage;
@@ -18,20 +20,26 @@ class Serve extends Command
     protected $description = 'Command description';
 
     protected array $channels = [];
-
-    protected array $tokens = [];
     protected array $users = [];
-
-//    public function __construct()
-//    {
-//        parent::__construct();
-//    }
 
     protected function load_channels(): void
     {
         foreach (Channel::query()->cursor() as $v) {
             $this->channels[$v->id] = (object)$v->toArray();
         }
+    }
+
+    protected function login(int $id, ?string $token)
+    {
+        $user = User::where('api_token', $token)->first();
+
+        if ($user) {
+            $this->users[$id] = $user;
+
+            return true;
+        }
+
+        return false;
     }
 
     public function handle(): int
@@ -50,24 +58,24 @@ class Serve extends Command
         });
 
         $server->on('Message', function (Server $server, Frame $frame) {
-            $token = json_decode($frame->data)->token;
+            $token = json_decode($frame->data)?->token ?? null;
 
-            if (array_key_exists($token, $this->tokens)) { // Пользователь найден
-                $server->push($frame->fd, $this->process_message($frame->data));
-            } else {
-                $user = User::where('api_token', $token)->first();
+//            $this->info("Received message: {$frame->data}");
 
-                if ($user) { // Пользователь найден, но ранее не был авторизован
-                    $this->tokens[$token] = $user;
-                    $server->push($frame->fd, $this->process_message($frame->data));
-                } else {
-                    $this->info('User auth error, closing connection');
+            if (!($this->users[$frame->fd] ?? null)) { // If user not logged in
+                if ($this->login($frame->fd, $token)) {
+                    $server->push($frame->fd, new AuthSuccess());
+
+                    $this->info('User logged in');
+                } else { // User auth error
+                    $server->push($frame->fd, new AuthError());
                     $server->close($frame->fd);
-                }
-            }
 
-            $this->info($this->tokens[$token]);
-            $this->info("Received message: {$frame->data}");
+                    $this->info('User auth error, closing connection');
+                }
+            } else { // If user logged in, process message
+                $server->push($frame->fd, $this->process_message($frame->data));
+            }
         });
 
         $server->on('Close', function (Server $server, int $fd) {
@@ -102,11 +110,13 @@ class Serve extends Command
                 switch (mb_strtoupper($request->target ?? null)) {
                     case 'CHANNEL_LIST':
                         $response = new ChannelList($this->channels);
+                        break;
                 }
 
                 break;
 
             default:
+                dump($request);
                 $this->error("Incorrect message type");
         }
 
