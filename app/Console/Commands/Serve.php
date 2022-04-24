@@ -6,6 +6,7 @@ use App\Messages\AuthError;
 use App\Messages\AuthSuccess;
 use App\Messages\ChannelList;
 use App\Messages\ChannelMessage;
+use App\Messages\ChannelMessageList;
 use App\Messages\ErrorMessage;
 use App\Messages\UserList;
 use App\Models\Channel;
@@ -160,6 +161,17 @@ class Serve extends Command
 
                     case 'USER_LIST':
                         $server->push($frame->fd, new UserList($this->users));
+                        break;
+
+                    case 'CHANNEL_MESSAGE':
+                        $channelId = $request->channel_id ?? null;
+                        $model = Message::query()
+                            ->where('channel_id', $channelId)
+                            ->orderBy('id', 'DESC')
+                            ->limit(10)
+                            ->get();
+
+                        $server->push($frame->fd, new ChannelMessageList($channelId, $model->toArray()));
                         break;
                 }
                 break;

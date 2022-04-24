@@ -89,7 +89,7 @@
     <h2>Messages</h2>
     <div id="messages">
         <div class="message channel">
-            <b class="user">USER1:</b> Demo message 1
+            <b class="user">USERNAME:</b> Demo message
         </div>
     </div>
 
@@ -118,22 +118,7 @@
             "name": "Mark Smith",
         },
     };
-    let channelMessages = { // Список всех сообщений в каналах
-        1: [
-            {
-                user_id: 1,
-                message: "Message text 1",
-            },
-            {
-                user_id: 1,
-                message: "Message text 2",
-            },
-            {
-                user_id: 1,
-                message: "Message text 3",
-            },
-        ],
-    };
+    let channelMessages = {}; // Список всех сообщений в каналах
     let commentMessages = {}; // Список всех комментариев к сообщениям
 
     let token = 'ffeffbeb44b538d48f3a26e768bbb59f88e558865764c544315c67608bf02c47';
@@ -171,7 +156,7 @@
     function channelMessageAppend(msg) { // Добавить в конец сообщение канала
         let user = users[msg.user_id];
 
-        messages.insertAdjacentHTML('beforeend', '<div class="message channel"><b>' + user.name + ': </b>' + msg.message + '</div>');
+        messages.insertAdjacentHTML('beforeend', '<div class="message channel"><b>' + user.name + ': </b>' + msg.value + '</div>');
     }
 
     function channelMessageAccept(msg) { // Принять входящее сообщение канала
@@ -186,7 +171,7 @@
         messages.innerHTML = null;
 
         if (!channelMessages[channelId]) {
-            channelMessages[channelId] = [];
+            channelMessagesRequest(channelId);
         }
 
         channelMessages[channelId].forEach(function (msg, k) {
@@ -194,8 +179,14 @@
         });
     }
 
-    function channelMessagesRequest() { // Загрузка сообщений канала с сервера
-
+    function channelMessagesRequest(channelId) { // Загрузка сообщений канала с сервера
+        channelMessages[channelId] = [];
+        // Получение списка сообщений канала
+        socket.send(JSON.stringify({
+            "type": "REQUEST",
+            "target": "CHANNEL_MESSAGE",
+            "channel_id": channelId,
+        }));
     }
 
     let socket = new WebSocket("ws://127.0.0.1:9101");
@@ -260,6 +251,12 @@
 
             msg.data.forEach((v, i) => {
                 users[v.id] = v;
+            });
+        }
+
+        if (msg.type == 'RESPONSE' && msg.target == 'CHANNEL_MESSAGE') {
+            msg.data.reverse().forEach((v) => {
+                channelMessageAccept(v);
             });
         }
 
