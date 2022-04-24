@@ -7,6 +7,6 @@ abstract class Message
 {
     public function __toString(): string
     {
-        return json_encode($this);
+        return json_encode($this, JSON_UNESCAPED_UNICODE);
     }
 }

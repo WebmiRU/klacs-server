@@ -7,7 +7,9 @@ use App\Messages\AuthSuccess;
 use App\Messages\ChannelList;
 use App\Messages\ChannelMessage;
 use App\Messages\ErrorMessage;
+use App\Messages\UserList;
 use App\Models\Channel;
+use App\Models\Message;
 use App\Models\User;
 use Illuminate\Console\Command;
 use Swoole\Http\Request;
@@ -20,13 +22,18 @@ class Serve extends Command
     protected $signature = 'serve';
     protected $description = 'Command description';
 
-    protected array $channels = [];
-    protected array $users = [];
+    protected array $connections = []; // Активные подключения к серверу
+    protected array $channels = []; // Список каналов (БД)
+    protected array $users = []; // Список пользователей (БД)
 
     protected function load_channels(): void
     {
         foreach (Channel::query()->cursor() as $v) {
             $this->channels[$v->id] = (object)$v->toArray();
+        }
+
+        foreach (User::query()->cursor() as $v) {
+            $this->users[$v->id] = (object)$v->toArray();
         }
     }
 
@@ -35,7 +42,7 @@ class Serve extends Command
         $user = User::where('api_token', $token)->first();
 
         if ($user) {
-            $this->users[$id] = $user;
+            $this->connections[$id] = $user;
 
             return true;
         }
@@ -63,7 +70,7 @@ class Serve extends Command
 
 //            $this->info("Received message: {$frame->data}");
 
-            if (!($this->users[$frame->fd] ?? null)) { // If user not logged in
+            if (!($this->connections[$frame->fd] ?? null)) { // If user not logged in
                 if ($this->login($frame->fd, $token)) {
                     $server->push($frame->fd, new AuthSuccess());
 
@@ -81,7 +88,7 @@ class Serve extends Command
         });
 
         $server->on('Close', function (Server $server, int $fd) {
-            unset($this->users[$fd]);
+            unset($this->connections[$fd]);
 
             $this->info("Client {$fd} connection closed");
         });
@@ -109,8 +116,14 @@ class Serve extends Command
                         if ($channelId && array_key_exists($channelId, $this->channels)) {
                             $message = $request->message ?? null;
 
+//                            dump($channelId, $this->connections[$frame->fd]->id, $message);
+                            Message::create([ // Сохраняем сообщение в БД
+                                'channel_id' => $channelId,
+                                'user_id' => $this->connections[$frame->fd]->id,
+                                'value' => $message ?? 'NONE',
+                            ]);
 
-                            foreach ($this->users as $fd => $user) {
+                            foreach ($this->connections as $fd => $user) {
                                 if ($user->channels->contains('id', $channelId)) {
                                     try {
                                         $server->push($fd, new ChannelMessage($user->id, $channelId, $message));
@@ -144,7 +157,15 @@ class Serve extends Command
                     case 'CHANNEL_LIST':
                         $server->push($frame->fd, new ChannelList($this->channels));
                         break;
+
+                    case 'USER_LIST':
+                        $server->push($frame->fd, new UserList($this->users));
+                        break;
                 }
+                break;
+
+            case 'AUTH':
+                // @TODO: Перенести авторизацию суда
                 break;
 
             default:

@@ -141,21 +141,26 @@
     let channelList = document.getElementById('channel-list');
     let messages = document.getElementById('messages');
 
+    if (localStorage.getItem('token')?.length) {
+        token = localStorage.getItem('token');
+    } else {
+        localStorage.setItem('token', token);
+    }
 
     // Отправка сообщения по нажатию кнопки Enter
-        messageInput.onkeydown = function (ev) {
+    messageInput.onkeydown = function (ev) {
         if (ev.key == 'Enter') {
-            sendMessage();
+            channelSendMessage();
             ev.preventDefault();
         }
     };
 
     // Функция отправки сообщения
-    function sendMessage() {
+    function channelSendMessage() {
         socket.send(JSON.stringify({
             "type": "MESSAGE",
             "target": "CHANNEL",
-            "channel_id": 1,
+            "channel_id": activeChannel,
             "message": messageInput.value,
         }));
 
@@ -180,7 +185,7 @@
     function channelMessagesShow(channelId) { // Функция отображения списка сообщений канала
         messages.innerHTML = null;
 
-        if(!channelMessages[channelId]) {
+        if (!channelMessages[channelId]) {
             channelMessages[channelId] = [];
         }
 
@@ -211,7 +216,12 @@
         socket.send(JSON.stringify({
             "type": "REQUEST",
             "target": "CHANNEL_LIST",
-            "token": token,
+        }));
+
+        // Получение списка всех пользователей
+        socket.send(JSON.stringify({
+            "type": "REQUEST",
+            "target": "USER_LIST",
         }));
     };
 
@@ -242,6 +252,14 @@
                 channel.innerText = v.title;
 
                 channelList.append(channel);
+            });
+        }
+
+        if (msg.type == 'RESPONSE' && msg.target == 'USER_LIST') {
+            users = {};
+
+            msg.data.forEach((v, i) => {
+                users[v.id] = v;
             });
         }
 
